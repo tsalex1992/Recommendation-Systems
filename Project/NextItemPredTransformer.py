@@ -205,11 +205,21 @@ class NextItemPredTransformer(nn.Module):
             self.dims.pre_trained_user_embeddings,
         )
 
-    def logits(self, tokens: torch.Tensor):
-        return self.decoder(tokens)
+    def logits(
+        self,
+        items: torch.Tensor,
+        users: Optional[torch.Tensor] = None,
+        time: Optional[torch.Tensor] = None,
+    ):
+        return self.decoder(items, users, time=time)
 
-    def forward(self, tokens: torch.Tensor) -> Dict[str, torch.Tensor]:
-        return self.decoder(tokens)
+    def forward(
+        self,
+        items: torch.Tensor,
+        users: Optional[torch.Tensor] = None,
+        time: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        return self.decoder(items, users, time=time)
 
     @property
     def device(self):
