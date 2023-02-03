@@ -134,6 +134,7 @@ class ItemDecoder(nn.Module):
         """
         super().__init__()
 
+        # Note we need to reserve special tokens for start and for padding(which is similar to end)
         self.items_embedding = nn.Embedding.from_pretrained(pre_trained_item_embeddings)
         self.users_embedding = (
             nn.Embedding.from_pretrained(pre_trained_user_embeddings)
@@ -154,7 +155,7 @@ class ItemDecoder(nn.Module):
     def forward(
         self,
         items: Tensor,
-        user: Optional[Tensor],
+        users: Optional[Tensor],
         kv_cache: Optional[dict] = None,
         time: Optional[Tensor] = None,
     ):
@@ -175,7 +176,7 @@ class ItemDecoder(nn.Module):
         )
 
         if self.users_embedding is not None:
-            items = items + self.users_embedding(user)
+            items = items + self.users_embedding(users)
 
         if time is not None:
             items = items + self.time_embedding(time)
