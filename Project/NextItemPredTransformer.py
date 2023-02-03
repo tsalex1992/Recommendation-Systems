@@ -162,6 +162,11 @@ class ItemDecoder(nn.Module):
         items : torch.LongTensor, shape = (batch_size, <= n_ctx)
             the text tokens
         user : torch.LongTensor, shape = (batch_size,)
+            the user id
+        kv_cache : dict, optional
+            a dictionary of cached key/value projections
+        time : torch.LongTensor, shape = (batch_size, <= n_ctx)
+            the time of ratings of each item for the user in the context in unix epoch seconds
         """
         offset = next(iter(kv_cache.values())).shape[1] if kv_cache else 0
         items = (
