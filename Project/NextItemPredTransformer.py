@@ -185,7 +185,6 @@ class ItemDecoder(nn.Module):
             self.items_embedding(items)
             + self.positional_embedding[offset : offset + items.shape[-1]]
         )
-        temp = self.time_embedding(user_interactions_times)
         if user_interactions_times is not None:
             items = items + self.time_embedding(user_interactions_times)
 
