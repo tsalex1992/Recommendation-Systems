@@ -57,6 +57,7 @@ class TrainingDataForNextItemPredInstance:
     items_ids: torch.Tensor
     times: torch.Tensor
     pred_index: int
+    true_item_id: torch.Tensor
 
 
 # Gets user ratings vectors and outputs all the subsequent items for each user
@@ -128,7 +129,7 @@ def prepare_training_data_for_next_item_pred_transformer(
         # Get the index of the EOS token
         eos_index = eos_indices[i]
         user_id = base_training_data.user_ids[i]
-        for j in range(1, eos_index):
+        for j in range(0, eos_index - 1):
             # Get the subsequence
             subsequence = user_items[0 : j + 1]
             # Fill the rest of the sequence with the EOS token
@@ -149,7 +150,7 @@ def prepare_training_data_for_next_item_pred_transformer(
             )
             # Create a TrainingDataForNextItemPredInstance
             training_data = TrainingDataForNextItemPredInstance(
-                user_id, subsequence, subsequence_times, j
+                user_id, subsequence, subsequence_times, j, user_items[j + 1]
             )
             # Yield the TrainingDataForNextItemPredInstance
             res.append(training_data)

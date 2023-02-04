@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset
 from typing import List
 import numpy as np
-from .utils import prepare_training_data_for_next_item_pred_transformer
+from utils import prepare_training_data_for_next_item_pred_transformer
 
 
 class NextItemPredDataset(Dataset):
@@ -20,4 +20,10 @@ class NextItemPredDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, index):
-        return self.data[index]
+        return (
+            self.data[index].user_id,
+            self.data[index].items_ids,
+            self.data[index].times,
+            self.data[index].pred_index,
+            self.data[index].true_item_id,
+        )

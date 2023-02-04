@@ -174,13 +174,15 @@ class ItemDecoder(nn.Module):
             the time of ratings of each item for the user in the context in unix epoch seconds
         """
         offset = next(iter(kv_cache.values())).shape[1] if kv_cache else 0
+        # Embed items
+        embedded_items = self.items_embedding(items)
         items = (
             self.items_embedding(items)
             + self.positional_embedding[offset : offset + items.shape[-1]]
         )
 
-        if user_interactions_times is not None:
-            items = items + self.time_embedding(user_interactions_times)
+        # if user_interactions_times is not None:
+        #     items = items + self.time_embedding(user_interactions_times)
 
         if self.users_embedding is not None and user is not None:
             embed_user = self.users_embedding(user)
@@ -223,7 +225,7 @@ class NextItemPredTransformer(nn.Module):
         user: Optional[torch.Tensor] = None,
         user_interactions_times: Optional[torch.Tensor] = None,
     ):
-        return self.decoder(items, user, time=user_interactions_times)
+        return self.decoder(items, user, user_interactions_times=user_interactions_times)
 
     def forward(
         self,
@@ -232,6 +234,18 @@ class NextItemPredTransformer(nn.Module):
         user_interactions_times: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         return self.decoder(items, user, user_interactions_times=user_interactions_times)
+
+    # Add no grad to avoid memory leak
+    @torch.no_grad()
+    def predict(
+        self,
+        items: torch.Tensor,
+        pred_index: int,
+        user: Optional[torch.Tensor] = None,
+        user_interactions_times: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        logits = self.decoder(items, user, user_interactions_times=user_interactions_times)
+        return logits[:, pred_index]
 
     @property
     def device(self):
