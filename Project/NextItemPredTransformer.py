@@ -12,10 +12,11 @@ from torch import nn
 @dataclass
 class ModelDimensions:
     pre_trained_item_embeddings: Tensor
-    n_item_ctx: int
-    n_item_state: int
-    n_item_head: int
-    n_item_layer: int
+    model_input_length: int
+    model_hidden_dim: int
+    vocab_size: int
+    n_attention_heads: int
+    n_decoder_layers: int
     pre_trained_user_embeddings: Optional[Tensor]
     use_concat_user_embedding: Optional[bool] = False
 
@@ -118,10 +119,10 @@ class ItemDecoder(nn.Module):
     def __init__(
         self,
         pre_trained_item_embeddings: Tensor,
-        n_ctx: int,
-        n_state: int,
-        n_head: int,
-        n_layer: int,
+        input_length: int,
+        hidden_dim: int,
+        n_attention_heads: int,
+        n_layers: int,
         pre_trained_user_embeddings: Optional[Tensor] = None,
         use_concat_user_embedding: bool = False,
     ):
@@ -129,10 +130,10 @@ class ItemDecoder(nn.Module):
 
         Args:
             pre_trained_item_embeddings: pre-trained item embeddings, of shape [n_vocab, n_state] ordered by item id
-            n_ctx: number of items in context
-            n_state: number of hidden units
-            n_head: number of attention heads
-            n_layer: number of layers
+            input_length: number of items in context
+            hidden_dim: number of hidden units
+            n_attention_heads: number of attention heads
+            n_layers: number of decoder layers
             pre_trained_user_embeddings: pre-trained user embeddings, of shape [n_users, n_state] ordered by user id
         """
         super().__init__()
@@ -145,15 +146,20 @@ class ItemDecoder(nn.Module):
             if pre_trained_user_embeddings is not None
             else None
         )
-        self.positional_embedding = nn.Parameter(torch.empty(n_ctx, n_state))
-        self.time_embedding = nn.Sequential(nn.Linear(1, n_state), nn.ReLU())
+        self.positional_embedding = nn.Parameter(torch.empty(input_length, hidden_dim))
+        # adds reshape layer after linear to get output of shape [batch_size, input_length, hidden_dim]
+        self.time_embedding = nn.Sequential(
+            nn.Linear(input_length, input_length * hidden_dim),
+            nn.Unflatten(1, (input_length, hidden_dim)),
+            nn.ReLU(),
+        )
 
         self.blocks: Iterable[ResidualAttentionBlock] = nn.ModuleList(
-            [ResidualAttentionBlock(n_state, n_head) for _ in range(n_layer)]
+            [ResidualAttentionBlock(hidden_dim, n_attention_heads) for _ in range(n_layers)]
         )
-        self.ln = LayerNorm(n_state)
+        self.ln = LayerNorm(hidden_dim)
 
-        mask = torch.empty(n_ctx, n_ctx).fill_(-np.inf).triu_(1)
+        mask = torch.empty(input_length, input_length).fill_(-np.inf).triu_(1)
         self.register_buffer("mask", mask, persistent=False)
 
     def forward(
@@ -175,14 +181,13 @@ class ItemDecoder(nn.Module):
         """
         offset = next(iter(kv_cache.values())).shape[1] if kv_cache else 0
         # Embed items
-        embedded_items = self.items_embedding(items)
         items = (
             self.items_embedding(items)
             + self.positional_embedding[offset : offset + items.shape[-1]]
         )
-
-        # if user_interactions_times is not None:
-        #     items = items + self.time_embedding(user_interactions_times)
+        temp = self.time_embedding(user_interactions_times)
+        if user_interactions_times is not None:
+            items = items + self.time_embedding(user_interactions_times)
 
         if self.users_embedding is not None and user is not None:
             embed_user = self.users_embedding(user)
@@ -209,12 +214,13 @@ class NextItemPredTransformer(nn.Module):
     def __init__(self, dims: ModelDimensions):
         super().__init__()
         self.dims = dims
+        self.vocab_size = dims.vocab_size
         self.decoder = ItemDecoder(
             self.dims.pre_trained_item_embeddings,
-            self.dims.n_item_ctx,
-            self.dims.n_item_state,
-            self.dims.n_item_head,
-            self.dims.n_item_layer,
+            self.dims.model_input_length,
+            self.dims.model_hidden_dim,
+            self.dims.n_attention_heads,
+            self.dims.n_decoder_layers,
             self.dims.pre_trained_user_embeddings,
             self.dims.use_concat_user_embedding,
         )
