@@ -17,6 +17,7 @@ class ModelDimensions:
     n_item_head: int
     n_item_layer: int
     pre_trained_user_embeddings: Optional[Tensor]
+    use_concat_user_embedding: Optional[bool] = False
 
 
 class LayerNorm(nn.LayerNorm):
@@ -122,6 +123,7 @@ class ItemDecoder(nn.Module):
         n_head: int,
         n_layer: int,
         pre_trained_user_embeddings: Optional[Tensor] = None,
+        use_concat_user_embedding: bool = False,
     ):
         """Item decoder
 
@@ -131,10 +133,12 @@ class ItemDecoder(nn.Module):
             n_state: number of hidden units
             n_head: number of attention heads
             n_layer: number of layers
+            pre_trained_user_embeddings: pre-trained user embeddings, of shape [n_users, n_state] ordered by user id
         """
         super().__init__()
 
         # Note we need to reserve special tokens for start and for padding(which is similar to end)
+        self.use_concat_user_embedding = use_concat_user_embedding
         self.items_embedding = nn.Embedding.from_pretrained(pre_trained_item_embeddings)
         self.users_embedding = (
             nn.Embedding.from_pretrained(pre_trained_user_embeddings)
@@ -155,9 +159,9 @@ class ItemDecoder(nn.Module):
     def forward(
         self,
         items: Tensor,
-        users: Optional[Tensor],
+        user: Optional[Tensor],
         kv_cache: Optional[dict] = None,
-        time: Optional[Tensor] = None,
+        user_interactions_times: Optional[Tensor] = None,
     ):
         """
         items : torch.LongTensor, shape = (batch_size, <= n_ctx)
@@ -166,7 +170,7 @@ class ItemDecoder(nn.Module):
             the user id
         kv_cache : dict, optional
             a dictionary of cached key/value projections
-        time : torch.LongTensor, shape = (batch_size, <= n_ctx)
+        user_interactions_times : torch.LongTensor, shape = (batch_size, <= n_ctx)
             the time of ratings of each item for the user in the context in unix epoch seconds
         """
         offset = next(iter(kv_cache.values())).shape[1] if kv_cache else 0
@@ -175,12 +179,19 @@ class ItemDecoder(nn.Module):
             + self.positional_embedding[offset : offset + items.shape[-1]]
         )
 
-        if self.users_embedding is not None:
-            items = items + self.users_embedding(users)
+        if user_interactions_times is not None:
+            items = items + self.time_embedding(user_interactions_times)
 
-        if time is not None:
-            items = items + self.time_embedding(time)
-
+        if self.users_embedding is not None and user is not None:
+            embed_user = self.users_embedding(user)
+            if self.use_concat_user_embedding:
+                # add the user embedding to the first item in context 0f each batch
+                # Works as concat since the first embedding is all zeros for SOS
+                items[:, 0, :] += embed_user
+            else:
+                # broadcast user embedding to all items in context
+                embed_user = embed_user.unsqueeze(1).expand(-1, items.shape[1], -1)
+                items = items + embed_user
         for block in self.blocks:
             items = block(items, mask=self.mask, kv_cache=kv_cache)
 
@@ -203,13 +214,24 @@ class NextItemPredTransformer(nn.Module):
             self.dims.n_item_head,
             self.dims.n_item_layer,
             self.dims.pre_trained_user_embeddings,
+            self.dims.use_concat_user_embedding,
         )
 
-    def logits(self, tokens: torch.Tensor):
-        return self.decoder(tokens)
+    def logits(
+        self,
+        items: torch.Tensor,
+        user: Optional[torch.Tensor] = None,
+        user_interactions_times: Optional[torch.Tensor] = None,
+    ):
+        return self.decoder(items, user, time=user_interactions_times)
 
-    def forward(self, tokens: torch.Tensor) -> Dict[str, torch.Tensor]:
-        return self.decoder(tokens)
+    def forward(
+        self,
+        items: torch.Tensor,
+        user: Optional[torch.Tensor] = None,
+        user_interactions_times: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        return self.decoder(items, user, user_interactions_times=user_interactions_times)
 
     @property
     def device(self):
