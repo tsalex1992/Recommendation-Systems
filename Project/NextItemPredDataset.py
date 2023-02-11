@@ -15,6 +15,8 @@ class NextItemPredDataset(Dataset):
         self.data = prepare_training_data_for_next_item_pred_transformer(
             user_ids, user_items_vectors, user_rating_times_vectors, max_seq_len
         )
+        # Order the data by pred_index
+        self.data = sorted(self.data, key=lambda x: x.pred_index)
 
     def __len__(self):
         return len(self.data)
