@@ -27,8 +27,12 @@ class CB2CFMultiModalEncoder(nn.Module):
         self.description_layer = nn.Sequential(
             nn.Linear(text_embedding_dim, item_embedding_dim), nn.ReLU(), nn.Dropout(0.2)
         )
-        self.fc_layer = nn.Sequential(
-            nn.Linear(7 * item_embedding_dim, item_embedding_dim),
+        self.combiner = nn.Sequential(
+            nn.LayerNorm(7 * item_embedding_dim),
+            nn.Linear(7 * item_embedding_dim, 3 * item_embedding_dim),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(3 * item_embedding_dim, item_embedding_dim),
             nn.ReLU(),
             nn.Dropout(0.2),
         )
@@ -49,5 +53,5 @@ class CB2CFMultiModalEncoder(nn.Module):
         movie_embedding = torch.cat(
             (genres, actors, directors, unix_release_time, description, language), dim=1
         )
-        movie_embedding = self.fc_layer(movie_embedding)
+        movie_embedding = self.combiner(movie_embedding)
         return movie_embedding

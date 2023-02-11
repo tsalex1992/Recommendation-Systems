@@ -168,6 +168,7 @@ class ItemDecoder(nn.Module):
         user: Optional[Tensor],
         kv_cache: Optional[dict] = None,
         user_interactions_times: Optional[Tensor] = None,
+        prediction_time: Optional[Tensor] = None,
     ):
         """
         items : torch.LongTensor, shape = (batch_size, <= n_ctx)
@@ -185,6 +186,10 @@ class ItemDecoder(nn.Module):
             self.items_embedding(items)
             + self.positional_embedding[offset : offset + items.shape[-1]]
         )
+        if prediction_time is not None and user_interactions_times is not None:
+            # add prediction time to the first time in context 0f each batch
+            # Works as concat since the first interaction time is all zeros for SOS
+            user_interactions_times[:, 0] += prediction_time
         if user_interactions_times is not None:
             items = items + self.time_embedding(user_interactions_times)
 
@@ -229,16 +234,28 @@ class NextItemPredTransformer(nn.Module):
         items: torch.Tensor,
         user: Optional[torch.Tensor] = None,
         user_interactions_times: Optional[torch.Tensor] = None,
+        prediction_time: Optional[torch.Tensor] = None,
     ):
-        return self.decoder(items, user, user_interactions_times=user_interactions_times)
+        return self.decoder(
+            items,
+            user,
+            user_interactions_times=user_interactions_times,
+            prediction_time=prediction_time,
+        )
 
     def forward(
         self,
         items: torch.Tensor,
         user: Optional[torch.Tensor] = None,
         user_interactions_times: Optional[torch.Tensor] = None,
+        prediction_time: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
-        return self.decoder(items, user, user_interactions_times=user_interactions_times)
+        return self.decoder(
+            items,
+            user,
+            user_interactions_times=user_interactions_times,
+            prediction_time=prediction_time,
+        )
 
     # Add no grad to avoid memory leak
     @torch.no_grad()
@@ -248,8 +265,14 @@ class NextItemPredTransformer(nn.Module):
         pred_index: int,
         user: Optional[torch.Tensor] = None,
         user_interactions_times: Optional[torch.Tensor] = None,
+        prediction_time: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        logits = self.decoder(items, user, user_interactions_times=user_interactions_times)
+        logits = self.decoder(
+            items,
+            user,
+            user_interactions_times=user_interactions_times,
+            prediction_time=prediction_time,
+        )
         return logits[:, pred_index]
 
     @property
