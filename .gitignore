@@ -19,3 +19,9 @@ Project/data2Keep/test_movies.pkl
 Project/data2Keep/test_users.pkl
 Project/data2Keep/train_movies.pkl
 Project/data2Keep/train_users.pkl
+Project/data2Keep/BPR1_item_embeddings.pkl
+Project/data2Keep/BPR1_user_embeddings.pkl
+Project/data2Keep/BPR2_item_embeddings.pkl
+Project/data2Keep/BPR2_user_embeddings.pkl
+Project/data2Keep/columnMappings.json
+Project/data/directors_embedding.npy
