@@ -14,54 +14,71 @@ class CB2CFMultiModalEncoder(nn.Module):
         dropout=0.2,
     ):
         super(CB2CFMultiModalEncoder, self).__init__()
-        text_embedding_dim = 384
+        self.text_embedding_dim = 384
         self.text_encoding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         self.text_encoding_model.max_seq_length = 400
+        self.genres_embedding_dim = item_embedding_dim * 2
+        self.actors_embedding_dim = item_embedding_dim * 2
+        self.directors_embedding_dim = item_embedding_dim
+        self.time_embedding_dim = item_embedding_dim
+        self.language_embedding_dim = item_embedding_dim
         self.genres_embedding = nn.Sequential(
-            nn.Linear(number_of_genres, item_embedding_dim),
-            nn.BatchNorm1d(item_embedding_dim),
+            nn.Linear(number_of_genres, self.genres_embedding_dim),
+            nn.BatchNorm1d(self.genres_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
         self.actors_embedding = nn.Sequential(
-            nn.Linear(number_of_actors, item_embedding_dim),
-            nn.BatchNorm1d(item_embedding_dim),
+            nn.Linear(number_of_actors, self.actors_embedding_dim),
+            nn.BatchNorm1d(self.actors_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
         self.directors_embedding = nn.Sequential(
-            nn.Linear(number_of_directors, item_embedding_dim),
-            nn.BatchNorm1d(item_embedding_dim),
+            nn.Linear(number_of_directors, self.directors_embedding_dim),
+            nn.BatchNorm1d(self.directors_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
         self.time_layer = nn.Sequential(
-            nn.Linear(1, item_embedding_dim),
-            nn.BatchNorm1d(item_embedding_dim),
+            nn.Linear(1, self.time_embedding_dim),
+            nn.BatchNorm1d(self.time_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
         self.language_embedding = nn.Sequential(
-            nn.Linear(number_of_languages, item_embedding_dim),
-            nn.BatchNorm1d(item_embedding_dim),
+            nn.Linear(number_of_languages, self.language_embedding_dim),
+            nn.BatchNorm1d(self.language_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
         self.description_layer = nn.Sequential(
-            nn.Linear(text_embedding_dim, text_embedding_dim),
-            nn.BatchNorm1d(text_embedding_dim),
+            nn.Linear(self.text_embedding_dim, self.text_embedding_dim),
+            nn.BatchNorm1d(self.text_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
+        self.combiner_input_dim = (
+            self.genres_embedding_dim
+            + self.actors_embedding_dim
+            + self.directors_embedding_dim
+            + self.time_embedding_dim
+            + self.language_embedding_dim
+            + self.text_embedding_dim
+        )
+
         self.combiner = nn.Sequential(
-            nn.LayerNorm(5 * item_embedding_dim + text_embedding_dim),
-            nn.Linear(5 * item_embedding_dim + text_embedding_dim, 3 * item_embedding_dim),
+            nn.LayerNorm(self.combiner_input_dim),
+            nn.Linear(self.combiner_input_dim, 3 * item_embedding_dim),
+            nn.BatchNorm1d(3 * item_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(3 * item_embedding_dim, item_embedding_dim),
+            nn.BatchNorm1d(item_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(item_embedding_dim, item_embedding_dim),
+            nn.BatchNorm1d(item_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
