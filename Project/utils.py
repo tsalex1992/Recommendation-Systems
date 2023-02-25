@@ -1,8 +1,15 @@
+from enum import Enum
 import torch
 import pickle
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
 import numpy as np
+from tqdm import tqdm
+
+
+class SPECIAL_TOKENS(Enum):
+    SOS = 0
+    EOS = 1
 
 
 def load_item_embeddings(n_items, n_item_state):
@@ -15,33 +22,13 @@ def load_item_embeddings(n_items, n_item_state):
     item_embeddings = torch.cat(
         [
             torch.zeros(1, n_item_state),
-            torch.ones(1, n_item_state),
+            # add inf embeddings for EOS
+            torch.ones(1, n_item_state) * np.inf,
             item_embeddings,
         ],
         dim=0,
     )
     return item_embeddings
-
-
-def convert_input_id_to_movie_id(input_id):
-    # If input_id is equal to n_items, then it is the SOS token
-    if input_id == 0:
-        return "SOS"
-    # If input_id is equal to n_items + 1, then it is the EOS token
-    elif input_id == 1:
-        return "EOS"
-    # If input_id is greater than n_items + 1, then it is a movie id
-    elif input_id > 1:
-        return input_id - 2
-
-
-def convert_movie_id_to_input_id(movie_id):
-    return movie_id + 2
-
-
-def get_movie_title_from_id(movies_df, movie_id):
-    # Go to the index of the movie id and get the title
-    return movies_df.iloc[movie_id]["title"]
 
 
 @dataclass
@@ -88,9 +75,9 @@ def prepare_base_training_data_for_next_item_pred_transformer(
 
     times = torch.zeros((len(user_rating_times_vectors), max_seq_len + 2), dtype=torch.long)
     # Convert the first column to the SOS token
-    items[:, 0] = 0
+    items[:, 0] = SPECIAL_TOKENS.SOS.value
     # Convert the last column to the EOS token
-    items[:, -1] = 1
+    items[:, -1] = SPECIAL_TOKENS.EOS.value
 
     # Iterate over each user and add their items to the matrix
     for i, user_items in enumerate(user_items_vectors):
@@ -114,18 +101,16 @@ def prepare_training_data_for_next_item_pred_transformer(
     user_rating_times_vectors: List[np.ndarray],
     max_seq_len: int,
 ) -> List[TrainingDataForNextItemPredInstance]:
-
     base_training_data = prepare_base_training_data_for_next_item_pred_transformer(
         user_ids, user_items_vectors, user_rating_times_vectors, max_seq_len
     )
-    eos_token = 1
     eos_indices = [len(user_items) for user_items in user_items_vectors]
     res = []
 
     # For each user get all the subsequences until the EOS token
     # Fill each sequence with the EOS token until the max_seq_len
 
-    for i, user_items in enumerate(base_training_data.items_ids):
+    for i, user_items in enumerate(tqdm(base_training_data.items_ids)):
         # Get the index of the EOS token
         eos_index = eos_indices[i]
         user_id = base_training_data.user_ids[i]

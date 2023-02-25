@@ -28,5 +28,4 @@ class NextItemPredDataset(Dataset):
             # Convert times to float
             self.data[index].times.float(),
             self.data[index].pred_index,
-            self.data[index].true_item_id,
         )
