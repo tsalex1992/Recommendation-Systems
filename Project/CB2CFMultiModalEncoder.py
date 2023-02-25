@@ -20,7 +20,7 @@ class CB2CFMultiModalEncoder(nn.Module):
         self.genres_embedding_dim = item_embedding_dim * 2
         self.actors_embedding_dim = item_embedding_dim * 2
         self.directors_embedding_dim = item_embedding_dim
-        self.time_embedding_dim = item_embedding_dim
+        self.time_embedding_dim = item_embedding_dim * 3
         self.language_embedding_dim = item_embedding_dim
         self.genres_embedding = nn.Sequential(
             nn.Linear(number_of_genres, self.genres_embedding_dim),
@@ -53,31 +53,32 @@ class CB2CFMultiModalEncoder(nn.Module):
             nn.Dropout(dropout),
         )
         self.description_layer = nn.Sequential(
-            nn.Linear(self.text_embedding_dim, self.text_embedding_dim),
-            nn.BatchNorm1d(self.text_embedding_dim),
+            nn.Linear(self.text_embedding_dim, 2 * self.text_embedding_dim),
+            nn.BatchNorm1d(2 * self.text_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
+        self.combiner_hidden_dim = 512
         self.combiner_input_dim = (
             self.genres_embedding_dim
             + self.actors_embedding_dim
             + self.directors_embedding_dim
             + self.time_embedding_dim
             + self.language_embedding_dim
-            + self.text_embedding_dim
+            + self.text_embedding_dim * 2
         )
 
         self.combiner = nn.Sequential(
             nn.LayerNorm(self.combiner_input_dim),
-            nn.Linear(self.combiner_input_dim, 3 * item_embedding_dim),
+            nn.Linear(self.combiner_input_dim, self.combiner_hidden_dim),
+            nn.BatchNorm1d(self.combiner_hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(self.combiner_hidden_dim, 3 * item_embedding_dim),
             nn.BatchNorm1d(3 * item_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(3 * item_embedding_dim, item_embedding_dim),
-            nn.BatchNorm1d(item_embedding_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(item_embedding_dim, item_embedding_dim),
             nn.BatchNorm1d(item_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),

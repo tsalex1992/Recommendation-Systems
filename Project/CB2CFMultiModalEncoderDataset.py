@@ -15,6 +15,7 @@ class CB2CFMultiModalEncoderDataset(Dataset):
         language: np.ndarray,
         movie_ids: np.ndarray,
         embedding: np.ndarray,
+        title: np.ndarray,
     ):
         # Convert the inputs to pytorch tensors
         self.genres = torch.from_numpy(genres).float()
@@ -22,6 +23,7 @@ class CB2CFMultiModalEncoderDataset(Dataset):
         self.directors = torch.from_numpy(directors).float()
         self.unix_release_time = torch.from_numpy(unix_release_time).float().unsqueeze(1)
         self.description = description
+        self.title = title
         self.language = torch.from_numpy(language).float()
         self.movie_ids = torch.from_numpy(movie_ids)
         self.embeddings = torch.from_numpy(embedding).float()
@@ -39,4 +41,5 @@ class CB2CFMultiModalEncoderDataset(Dataset):
             "language": self.language[index],
             "movie_ids": self.movie_ids[index],
             "embeddings": self.embeddings[index],
+            "title": self.title[index],
         }
