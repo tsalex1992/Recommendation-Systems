@@ -16,12 +16,13 @@ class CB2CFMultiModalEncoder(nn.Module):
         super(CB2CFMultiModalEncoder, self).__init__()
         self.text_embedding_dim = 384
         self.text_encoding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-        self.text_encoding_model.max_seq_length = 400
+        self.text_encoding_model.max_seq_length = 500
         self.genres_embedding_dim = item_embedding_dim * 2
         self.actors_embedding_dim = item_embedding_dim * 2
         self.directors_embedding_dim = item_embedding_dim
         self.time_embedding_dim = item_embedding_dim * 3
         self.language_embedding_dim = item_embedding_dim
+        self.description_embedding_dim = item_embedding_dim * 2
         self.genres_embedding = nn.Sequential(
             nn.Linear(number_of_genres, self.genres_embedding_dim),
             nn.BatchNorm1d(self.genres_embedding_dim),
@@ -53,8 +54,8 @@ class CB2CFMultiModalEncoder(nn.Module):
             nn.Dropout(dropout),
         )
         self.description_layer = nn.Sequential(
-            nn.Linear(self.text_embedding_dim, 2 * self.text_embedding_dim),
-            nn.BatchNorm1d(2 * self.text_embedding_dim),
+            nn.Linear(self.text_embedding_dim, self.description_embedding_dim),
+            nn.BatchNorm1d(self.description_embedding_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
@@ -65,11 +66,13 @@ class CB2CFMultiModalEncoder(nn.Module):
             + self.directors_embedding_dim
             + self.time_embedding_dim
             + self.language_embedding_dim
-            + self.text_embedding_dim * 2
+            + self.description_embedding_dim
         )
 
         self.combiner = nn.Sequential(
             nn.LayerNorm(self.combiner_input_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
             nn.Linear(self.combiner_input_dim, self.combiner_hidden_dim),
             nn.BatchNorm1d(self.combiner_hidden_dim),
             nn.ReLU(),
@@ -79,9 +82,6 @@ class CB2CFMultiModalEncoder(nn.Module):
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(3 * item_embedding_dim, item_embedding_dim),
-            nn.BatchNorm1d(item_embedding_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
         )
         self.freeze_parameters()
 
