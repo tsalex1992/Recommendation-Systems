@@ -1,3 +1,6 @@
+import torch
+
+
 class Tokenizer(object):
     def __init__(self, item_ids, user_ids):
         self.item_ids = item_ids
@@ -19,12 +22,10 @@ class Tokenizer(object):
         self.user_id_to_index_mapping = {
             user_id: index for index, user_id in enumerate(self.user_ids)
         }
-        self.index_to_item_id_mapping = {
-            index + 2: item_id for index, item_id in enumerate(self.item_ids)
-        }
-        self.index_to_user_id_mapping = {
-            index: user_id for index, user_id in enumerate(self.user_ids)
-        }
+        # create a reverse mapping
+        self.index_to_item_id_mapping = {v: k for k, v in self.item_id_to_index_mapping.items()}
+
+        self.index_to_user_id_mapping = {v: k for k, v in self.user_id_to_index_mapping.items()}
 
     def _item_id_to_index(self, item_id):
         return self.item_id_to_index_mapping[item_id]
@@ -70,12 +71,22 @@ class Tokenizer(object):
 
     def encode_items(self, items):
         return [self._item_id_to_index(item) for item in items]
+        # convert to tensor
+        # apply _item_id_to_index to each element in the tensor
+        # return torch.tensor(
+        # [self._item_id_to_index(item.item()) for item in items], dtype=torch.long
+        # )
 
     def encode_item(self, item):
         return self._item_id_to_index(item)
 
-    def encode_users(self, users):
+    def encode_users(self, users: torch.Tensor) -> torch.Tensor:
         return [self._user_id_to_index(user) for user in users]
+        # convert to tensor
+        # apply _user_id_to_index to each element in the tensor
+        # return torch.tensor(
+        # [self._user_id_to_index(user.item()) for user in users], dtype=torch.long
+        # )
 
     def encode_user(self, user):
         return self._user_id_to_index(user)

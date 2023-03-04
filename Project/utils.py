@@ -100,12 +100,11 @@ def prepare_training_data_for_next_item_pred_transformer(
     user_items_vectors: List[np.ndarray],
     user_rating_times_vectors: List[np.ndarray],
     max_seq_len: int,
-) -> List[TrainingDataForNextItemPredInstance]:
+) -> Tuple:
     base_training_data = prepare_base_training_data_for_next_item_pred_transformer(
         user_ids, user_items_vectors, user_rating_times_vectors, max_seq_len
     )
     eos_indices = [len(user_items) for user_items in user_items_vectors]
-    res = []
 
     # For each user get all the subsequences until the EOS token
     # Fill each sequence with the EOS token until the max_seq_len
@@ -133,10 +132,44 @@ def prepare_training_data_for_next_item_pred_transformer(
                     torch.zeros(max_seq_len + 2 - len(subsequence_times), dtype=torch.long),
                 ]
             )
-            # Create a TrainingDataForNextItemPredInstance
-            training_data = TrainingDataForNextItemPredInstance(
-                user_id, subsequence, subsequence_times, j, user_items[j + 1]
-            )
-            # Yield the TrainingDataForNextItemPredInstance
-            res.append(training_data)
-    return res
+            yield user_id, subsequence, subsequence_times.float(), j, user_items[j + 1]
+
+
+def prepare_test_data_for_next_item_pred_transformer(
+    user_ids: List,
+    user_items_vectors: List[np.ndarray],
+    user_rating_times_vectors: List[np.ndarray],
+    max_seq_len: int,
+) -> Tuple:
+    base_training_data = prepare_base_training_data_for_next_item_pred_transformer(
+        user_ids, user_items_vectors, user_rating_times_vectors, max_seq_len
+    )
+    eos_indices = [len(user_items) for user_items in user_items_vectors]
+
+    # For each user get all the subsequences until the EOS token
+    # Fill each sequence with the EOS token until the max_seq_len
+
+    for i, user_items in enumerate(tqdm(base_training_data.items_ids)):
+        # Get the index of the EOS token
+        eos_index = eos_indices[i]
+        user_id = base_training_data.user_ids[i]
+        j = eos_index - 2
+        # Get the subsequence
+        subsequence = user_items[0 : j + 1]
+        # Fill the rest of the sequence with the EOS token
+        subsequence = torch.cat(
+            [
+                subsequence,
+                torch.ones(max_seq_len + 2 - len(subsequence), dtype=torch.long),
+            ]
+        )
+        # Get the subsequence times
+        subsequence_times = base_training_data.times[i][0 : j + 1]
+        # Fill the rest of the sequence with the EOS token
+        subsequence_times = torch.cat(
+            [
+                subsequence_times,
+                torch.zeros(max_seq_len + 2 - len(subsequence_times), dtype=torch.long),
+            ]
+        )
+        yield user_id, subsequence, subsequence_times.float(), j, user_items[j + 1]
